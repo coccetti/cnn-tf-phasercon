@@ -100,29 +100,29 @@ print("- reference_class_short tensor shape: ", reference_class_short.shape)
 
 
 #%% Resize images
-x_crop_size = 32
-y_crop_size = 32
+x_crop_size = 128
+y_crop_size = 128
 print(measured_phase.shape)
 resize_measured_phase = np.zeros((Nframes, x_crop_size, y_crop_size))
 
 for ii in range(Nframes):
     resize_measured_phase[ii] = cv2.resize(measured_phase[ii], (x_crop_size, y_crop_size), interpolation = cv2.INTER_NEAREST)
-    print(ii)
+
 # reassign values just to make things works simplier
 measured_phase = resize_measured_phase
 
 #%% Crop images
-# n_crops_per_image = 100  # number of crops per image
-# x_crop_size = 32  # number of pixels for x axis
-# y_crop_size = 32  # number of pixels for x axis
+# n_crops_per_image = 10  # number of crops per image
+# x_crop_size = 64  # number of pixels for x axis
+# y_crop_size = 64  # number of pixels for x axis
 # tf.random.set_seed(1234)
 
-# crop_measured_phase = tf.image.random_crop(value=measured_phase, size=(Nframes, x_crop_size, y_crop_size))
-# # crop_measured_phase = tf.image.stateless_random_crop(value=measured_phase, size=(Nframes, x_crop_size, y_crop_size), seed=(1,0))
+# # crop_measured_phase = tf.image.random_crop(value=measured_phase, size=(Nframes, x_crop_size, y_crop_size))
+# crop_measured_phase = tf.image.stateless_random_crop(value=measured_phase, size=(Nframes, x_crop_size, y_crop_size), seed=(1,0))
 # crop_reference_class_short = reference_class_short
 # for ii in range(n_crops_per_image-1):
-#     crop_measured_phase_temp = tf.image.random_crop(value=measured_phase, size=(Nframes, x_crop_size, y_crop_size))
-#     # crop_measured_phase_temp = tf.image.stateless_random_crop(value=measured_phase, size=(Nframes, x_crop_size, y_crop_size), seed=(1,0))
+#     # crop_measured_phase_temp = tf.image.random_crop(value=measured_phase, size=(Nframes, x_crop_size, y_crop_size))
+#     crop_measured_phase_temp = tf.image.stateless_random_crop(value=measured_phase, size=(Nframes, x_crop_size, y_crop_size), seed=(1,0))
 #     crop_measured_phase = np.concatenate((crop_measured_phase, crop_measured_phase_temp))
 #     crop_reference_class_short = np.concatenate((crop_reference_class_short, reference_class_short))
 
@@ -203,7 +203,7 @@ model.compile(optimizer='adam',
               loss=tf.keras.losses.SparseCategoricalCrossentropy(from_logits=True),
               metrics=['accuracy'])
 
-history = model.fit(train_measured_phase, train_reference_class_short, epochs=20, 
+history = model.fit(train_measured_phase, train_reference_class_short, epochs=10, 
                     validation_data=(test_measured_phase, test_reference_class_short))
 
 
