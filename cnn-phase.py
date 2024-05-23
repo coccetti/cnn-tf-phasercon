@@ -5,6 +5,7 @@
 # Inputs are npy-files: measured_phase.py
 # with dim: 1200x 1920
 # and min: -PI and max: +PI
+# xcopy .\*_phase.npy C:\Users\LFC_01\destination\ /S /C /Y
 
 #%% Imports
 import tensorflow as tf
@@ -21,18 +22,20 @@ import cv2
 #%% Parameters
 
 # Number of RUN
-nRUN=20
+nRUN=40
 
 # Data path
 # data_path = r'C:\Users\LFC_01\Desktop\Szilard\Data'
-data_path = r'data'
+data_path = r'data2'
 
 # Date of measurements
 # date='2024_04_04'
 date=''
     
 # Define the type of measure, so we can read the proper folder
-data_type_measure = "SLM_Interferometer_alignment"
+# data_type_measure = "SLM_Interferometer_alignment"
+data_type_measure = ''
+
 
 # Classes
 classes=["input_mask_blank_screen", 'input_mask_vertical_division', 'input_mask_horizontal_division', 'input_mask_checkboard_1', 'input_mask_checkboard_2', 'input_mask_checkboard_3', 'input_mask_checkboard_4']
@@ -97,40 +100,40 @@ print("- reference_class_short tensor shape: ", reference_class_short.shape)
 
 
 #%% Resize images
-# x_crop_size = 32
-# y_crop_size = 32
-# print(measured_phase.shape)
-# resize_measured_phase = np.zeros((Nframes, x_crop_size, y_crop_size))
+x_crop_size = 32
+y_crop_size = 32
+print(measured_phase.shape)
+resize_measured_phase = np.zeros((Nframes, x_crop_size, y_crop_size))
 
-# for ii in range(Nframes):
-#     resize_measured_phase[ii] = cv2.resize(measured_phase[ii], (x_crop_size, y_crop_size), interpolation = cv2.INTER_NEAREST)
-#     print(ii)
-# # reassign values just to make things works simplier
-# measured_phase = resize_measured_phase
+for ii in range(Nframes):
+    resize_measured_phase[ii] = cv2.resize(measured_phase[ii], (x_crop_size, y_crop_size), interpolation = cv2.INTER_NEAREST)
+    print(ii)
+# reassign values just to make things works simplier
+measured_phase = resize_measured_phase
 
 #%% Crop images
-n_crops_per_image = 100  # number of crops per image
-x_crop_size = 32  # number of pixels for x axis
-y_crop_size = 32  # number of pixels for x axis
-tf.random.set_seed(1234)
+# n_crops_per_image = 100  # number of crops per image
+# x_crop_size = 32  # number of pixels for x axis
+# y_crop_size = 32  # number of pixels for x axis
+# tf.random.set_seed(1234)
 
-crop_measured_phase = tf.image.random_crop(value=measured_phase, size=(Nframes, x_crop_size, y_crop_size))
-# crop_measured_phase = tf.image.stateless_random_crop(value=measured_phase, size=(Nframes, x_crop_size, y_crop_size), seed=(1,0))
-crop_reference_class_short = reference_class_short
-for ii in range(n_crops_per_image-1):
-    crop_measured_phase_temp = tf.image.random_crop(value=measured_phase, size=(Nframes, x_crop_size, y_crop_size))
-    # crop_measured_phase_temp = tf.image.stateless_random_crop(value=measured_phase, size=(Nframes, x_crop_size, y_crop_size), seed=(1,0))
-    crop_measured_phase = np.concatenate((crop_measured_phase, crop_measured_phase_temp))
-    crop_reference_class_short = np.concatenate((crop_reference_class_short, reference_class_short))
+# crop_measured_phase = tf.image.random_crop(value=measured_phase, size=(Nframes, x_crop_size, y_crop_size))
+# # crop_measured_phase = tf.image.stateless_random_crop(value=measured_phase, size=(Nframes, x_crop_size, y_crop_size), seed=(1,0))
+# crop_reference_class_short = reference_class_short
+# for ii in range(n_crops_per_image-1):
+#     crop_measured_phase_temp = tf.image.random_crop(value=measured_phase, size=(Nframes, x_crop_size, y_crop_size))
+#     # crop_measured_phase_temp = tf.image.stateless_random_crop(value=measured_phase, size=(Nframes, x_crop_size, y_crop_size), seed=(1,0))
+#     crop_measured_phase = np.concatenate((crop_measured_phase, crop_measured_phase_temp))
+#     crop_reference_class_short = np.concatenate((crop_reference_class_short, reference_class_short))
 
-print("crop_measured_phase: ", tf.shape(crop_measured_phase).numpy())
-print("crop_reference_class_short: ", crop_reference_class_short.shape)
+# print("crop_measured_phase: ", tf.shape(crop_measured_phase).numpy())
+# print("crop_reference_class_short: ", crop_reference_class_short.shape)
 
-# reassign values just to make things works simplier
-measured_phase = crop_measured_phase
-reference_class_short = crop_reference_class_short
-Nframes = Nframes*n_crops_per_image
-sys.exit()
+# # reassign values just to make things works simplier
+# measured_phase = crop_measured_phase
+# reference_class_short = crop_reference_class_short
+# Nframes = Nframes*n_crops_per_image
+
 
 #%% Split data between Train and Test, then Normalization
 train_set_percentage=0.9 # Set training set percentage
