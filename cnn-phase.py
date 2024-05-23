@@ -15,6 +15,7 @@ from keras import datasets, layers, models
 import numpy as np
 import matplotlib.pyplot as plt
 import os, sys
+import cv2
 
 
 #%% Parameters
@@ -94,27 +95,44 @@ for i in range(nRUN):
 print("- measured_phase tensor shape: ", tf.shape(measured_phase).numpy())
 print("- reference_class_short tensor shape: ", reference_class_short.shape)
 
+
+#%% Resize images
+# x_crop_size = 32
+# y_crop_size = 32
+# print(measured_phase.shape)
+# resize_measured_phase = np.zeros((Nframes, x_crop_size, y_crop_size))
+
+# for ii in range(Nframes):
+#     resize_measured_phase[ii] = cv2.resize(measured_phase[ii], (x_crop_size, y_crop_size), interpolation = cv2.INTER_NEAREST)
+#     print(ii)
+# # reassign values just to make things works simplier
+# measured_phase = resize_measured_phase
+
 #%% Crop images
-n_crops_per_image = 10  # number of crops per image
+n_crops_per_image = 100  # number of crops per image
 x_crop_size = 32  # number of pixels for x axis
 y_crop_size = 32  # number of pixels for x axis
+tf.random.set_seed(1234)
 
-crop_measured_phase = tf.image.stateless_random_crop(value=measured_phase, size=(Nframes, x_crop_size, y_crop_size), seed=(1,0))
+crop_measured_phase = tf.image.random_crop(value=measured_phase, size=(Nframes, x_crop_size, y_crop_size))
+# crop_measured_phase = tf.image.stateless_random_crop(value=measured_phase, size=(Nframes, x_crop_size, y_crop_size), seed=(1,0))
 crop_reference_class_short = reference_class_short
 for ii in range(n_crops_per_image-1):
-    crop_measured_phase_temp = tf.image.stateless_random_crop(value=measured_phase, size=(Nframes, x_crop_size, y_crop_size), seed=(1,0))
+    crop_measured_phase_temp = tf.image.random_crop(value=measured_phase, size=(Nframes, x_crop_size, y_crop_size))
+    # crop_measured_phase_temp = tf.image.stateless_random_crop(value=measured_phase, size=(Nframes, x_crop_size, y_crop_size), seed=(1,0))
     crop_measured_phase = np.concatenate((crop_measured_phase, crop_measured_phase_temp))
     crop_reference_class_short = np.concatenate((crop_reference_class_short, reference_class_short))
 
 print("crop_measured_phase: ", tf.shape(crop_measured_phase).numpy())
 print("crop_reference_class_short: ", crop_reference_class_short.shape)
 
-# reassign values just to make things worls siplier
+# reassign values just to make things works simplier
 measured_phase = crop_measured_phase
 reference_class_short = crop_reference_class_short
 Nframes = Nframes*n_crops_per_image
+sys.exit()
 
-#%% Split data between Train and Test
+#%% Split data between Train and Test, then Normalization
 train_set_percentage=0.9 # Set training set percentage
 print(np.int32(Nframes * train_set_percentage))
 print(Nframes-np.int32(Nframes*train_set_percentage))
@@ -140,7 +158,25 @@ test_measured_phase = (test_measured_phase - np.min(test_measured_phase)) / (np.
 #     plt.imshow(train_measured_phase[i])
 #     plt.xlabel(int(train_reference_class_short[i]))
 # plt.show()
-
+# plt.figure(figsize=(10,10))
+# for i in range(25):
+#     plt.subplot(5,5,i+1)
+#     plt.xticks([])
+#     plt.yticks([])
+#     plt.grid(False)
+#     plt.imshow(train_measured_phase[i+180])
+#     plt.xlabel(int(train_reference_class_short[i+180]))
+# plt.show()
+# plt.figure(figsize=(10,10))
+# for i in range(25):
+#     plt.subplot(5,5,i+1)
+#     plt.xticks([])
+#     plt.yticks([])
+#     plt.grid(False)
+#     plt.imshow(test_measured_phase[i])
+#     plt.xlabel(int(test_reference_class_short[i]))
+# plt.show()
+# sys.exit()
 
 #%% Create the convolutional base
 model = models.Sequential()
@@ -164,7 +200,7 @@ model.compile(optimizer='adam',
               loss=tf.keras.losses.SparseCategoricalCrossentropy(from_logits=True),
               metrics=['accuracy'])
 
-history = model.fit(train_measured_phase, train_reference_class_short, epochs=5, 
+history = model.fit(train_measured_phase, train_reference_class_short, epochs=20, 
                     validation_data=(test_measured_phase, test_reference_class_short))
 
 
@@ -173,7 +209,7 @@ plt.plot(history.history['accuracy'], label='accuracy')
 plt.plot(history.history['val_accuracy'], label = 'val_accuracy')
 plt.xlabel('Epoch')
 plt.ylabel('Accuracy')
-plt.ylim([0.5, 1])
+plt.ylim([0.0, 1])
 plt.legend(loc='lower right')
 plt.show()
 
