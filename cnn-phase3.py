@@ -25,8 +25,8 @@ import time   # compute elapsed time
 # ############################
 # Crop images parameters
 n_crops_per_image = 2  # number of crops per image (minimum 2)
-y_crop_size = 1200  # number of pixels for y axis (high max 1200)
 x_crop_size = 1920  # number of pixels for x axis (width max 1920)
+y_crop_size = 1200  # number of pixels for y axis (high max 1200)
 tf.random.set_seed(1234)  # initialize random seed for tensorflow
 # Resize images parameters
 x_resize = 64  # width
@@ -56,19 +56,31 @@ classes=["input_mask_blank_screen",
          "input_mask_checkboard_3A", "input_mask_checkboard_3B",
          "input_mask_checkboard_4A", "input_mask_checkboard_4B",]
 classes_short=np.arange(np.size(classes))
-print("\nClasses in words:", classes)
-print("Classes in numbers: ", classes_short)
-print("Total number of classes: ", np.size(classes))
 
 # Measured Phase file names
 measured_phase_input_file = "measured_phase.npy"
 
 # Number of frames
 frame_number=nRUN*np.size(classes)
-print("\nMeasured data | frame_number (number of RUNs * number of classes): ", frame_number)
+
+# Print values
+print("\n=================================================================")
+print("Input values: ")
+print(" - n_crops_per_image: ", n_crops_per_image)
+print(" - x_crop_size: ", x_crop_size)
+print(" - y_crop_size: ", y_crop_size)
+print(" - x_resize", x_resize)
+print(" - y_resize", y_resize)
+print(" - nRUN: ", nRUN)
+print(" - Classes in words:", classes)
+print(" - Classes in numbers: ", classes_short)
+print(" - Total number of classes: ", np.size(classes))
+print(" - Measured data | frame_number (number of RUNs * number of classes): ", frame_number)
+print("=================================================================")
+
 
 #%% Determine high and widht of the matrix reading the data
-
+print("\n### Start of reading data ###")
 sample_measured_phase_full_path = os.path.join(data_path, date, data_type_measure, "M00001", classes[0], "files", measured_phase_input_file)
 sample_measured_phase = np.load(sample_measured_phase_full_path)
 high, width = sample_measured_phase.shape
@@ -93,15 +105,6 @@ for i in range(nRUN):
         input_files_path = os.path.join(data_path, date,data_type_measure, RUN, class_name, "files", measured_phase_input_file)
         measured_phase[j,:,:] = np.load(input_files_path)
         reference_class_short[j] = k
-        # ### Plot figure
-        # img=plt.imshow(measured_phase[:,:,j])#cmap='Blues'
-        # plt.axis('off')
-        # plt.colorbar(img)
-        # plt.show()
-        # plt.pause(0.1)
-        # print(input_files_path)
-        # print(j)
-        
         # ### Test print values of the measured phase
         # print("\nShape of measured phase: ", measured_phase.shape)
         # print(reference_class_short.shape)
@@ -110,6 +113,18 @@ for i in range(nRUN):
 
         k+=1
         j+=1
+
+# # Plot and Verify the data
+# plt.figure(figsize=(10,10))
+# for i in range(25):
+#     plt.subplot(5,5,i+1)
+#     plt.xticks([])
+#     plt.yticks([])
+#     plt.grid(False)
+#     plt.imshow(measured_phase[i])
+#     plt.xlabel(int(reference_class_short[i]))
+# plt.show()
+# # End of plot
 
 # Print arrays dimensions
 print("- measured_phase tensor shape: ", tf.shape(measured_phase).numpy())
@@ -123,7 +138,7 @@ crop_measured_phase = tf.image.random_crop(value=measured_phase, size=(frame_num
 # crop_measured_phase = tf.image.stateless_random_crop(value=measured_phase, size=(frame_number, y_crop_size, x_crop_size), seed=(1,0))
 crop_reference_class_short = reference_class_short
 print("First crop done.")
-for ii in range(n_crops_per_image-1):
+for ii in range(n_crops_per_image - 1):
     start_time = time.time()
     crop_measured_phase_temp = tf.image.random_crop(value=measured_phase, size=(frame_number, y_crop_size, x_crop_size))
     # crop_measured_phase_temp = tf.image.stateless_random_crop(value=measured_phase, size=(frame_number, y_crop_size, x_crop_size), seed=(1,0))
@@ -143,6 +158,19 @@ reference_class_short = crop_reference_class_short
 frame_number = frame_number * n_crops_per_image
 print("\nCrop images | New frame_number = (frame_number * number of crops): ", frame_number)
 
+# # Plot and Verify the data
+# plt.figure(figsize=(10,10))
+# for i in range(25):
+#     plt.subplot(5,5,i+1)
+#     plt.xticks([])
+#     plt.yticks([])
+#     plt.grid(False)
+#     plt.imshow(measured_phase[i+620])
+#     plt.xlabel(int(reference_class_short[i+620]))
+# plt.show()
+# sys.exit()
+# # end of plot
+
 
 #%% Resize images
 print("\n### Start of resizing ###")
@@ -157,7 +185,8 @@ measured_phase = resize_measured_phase
 
 
 #%% Split data between Train and Test, then Normalization
-train_set_percentage=0.9 # Set training set percentage
+print("\n### Splitting data ###")
+train_set_percentage = 0.9  # Set training set percentage
 print("train_set split number: ", np.int32(frame_number * train_set_percentage))
 print("test_set split number: ", frame_number-np.int32(frame_number*train_set_percentage))
 
@@ -188,8 +217,8 @@ test_measured_phase = (test_measured_phase - np.min(test_measured_phase)) / (np.
 #     plt.xticks([])
 #     plt.yticks([])
 #     plt.grid(False)
-#     plt.imshow(train_measured_phase[i+180])
-#     plt.xlabel(int(train_reference_class_short[i+180]))
+#     plt.imshow(train_measured_phase[i+620])
+#     plt.xlabel(int(train_reference_class_short[i+620]))
 # plt.show()
 # plt.figure(figsize=(10,10))
 # for i in range(25):
@@ -201,8 +230,10 @@ test_measured_phase = (test_measured_phase - np.min(test_measured_phase)) / (np.
 #     plt.xlabel(int(test_reference_class_short[i]))
 # plt.show()
 # sys.exit()
+# # End of plot
 
 #%% Create the convolutional base
+print("\n### Create neurons ###")
 model = models.Sequential()
 model.add(layers.Conv2D(32, (3, 3), activation='relu', input_shape=(y_resize, x_resize,1)))
 model.add(layers.MaxPooling2D((2, 2)))
