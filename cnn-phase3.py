@@ -16,10 +16,22 @@ from keras import datasets, layers, models
 import numpy as np
 import matplotlib.pyplot as plt
 import os, sys
-import cv2
-
+import cv2  # resize image wisely
+import time   # compute elapsed time
 
 #%% Parameters
+# ############################
+# Set main parameters to play 
+# ############################
+# Crop images parameters
+n_crops_per_image = 2  # number of crops per image (minimum 2)
+y_crop_size = 1200  # number of pixels for y axis (high max 1200)
+x_crop_size = 1920  # number of pixels for x axis (width max 1920)
+tf.random.set_seed(1234)  # initialize random seed for tensorflow
+# Resize images parameters
+x_resize = 64  # width
+y_resize = 64  # high
+# ###########################
 
 # Number of RUN
 nRUN=30
@@ -35,9 +47,7 @@ date=''
 # Define the type of measure, so we can read the proper folder
 data_type_measure = "SLM_Interferometer_alignment"
 
-
 # Classes
-# classes=["input_mask_blank_screen", 'input_mask_vertical_division', 'input_mask_horizontal_division', 'input_mask_checkboard_1', 'input_mask_checkboard_2', 'input_mask_checkboard_3', 'input_mask_checkboard_4']
 classes=["input_mask_blank_screen", 
          "input_mask_horizontal_division_A", "input_mask_horizontal_division_B", 
          "input_mask_vertical_division_A", "input_mask_vertical_division_B",
@@ -47,30 +57,31 @@ classes=["input_mask_blank_screen",
          "input_mask_checkboard_4A", "input_mask_checkboard_4B",]
 classes_short=np.arange(np.size(classes))
 print("\nClasses in words:", classes)
-print("\nClasses in numbers: ", classes_short)
+print("Classes in numbers: ", classes_short)
+print("Total number of classes: ", np.size(classes))
 
 # Measured Phase file names
 measured_phase_input_file = "measured_phase.npy"
 
 # Number of frames
-Nframes=nRUN*np.size(classes)
-print("\nNframes (nRUN * classes): ", Nframes)
+frame_number=nRUN*np.size(classes)
+print("\nMeasured data | frame_number (number of RUNs * number of classes): ", frame_number)
 
 #%% Determine high and widht of the matrix reading the data
 
 sample_measured_phase_full_path = os.path.join(data_path, date, data_type_measure, "M00001", classes[0], "files", measured_phase_input_file)
 sample_measured_phase = np.load(sample_measured_phase_full_path)
 high, width = sample_measured_phase.shape
-print("\nLoaded sample phase with dimensions (high, width): ", high, width)
+print("\nLoaded sample phase with dimensions in px (high, width): ", high, width)
 
 
 #%% Load data and plot
 
 # initialization of the frame matrix
-measured_phase = np.zeros((Nframes, high, width))
-reference_class_short = np.zeros((Nframes, 1), dtype=int)
+measured_phase = np.zeros((frame_number, high, width))
+reference_class_short = np.zeros((frame_number, 1), dtype=int)
 
-j=0 #  index for NFrames (varies from 0 to Nframes-1)
+j=0 #  index for frame_number (varies from 0 to frame_number-1)
 for i in range(nRUN):
     RUN = 'M0000' + str(i+1)
     if i+1 > 9:
@@ -105,49 +116,53 @@ print("- measured_phase tensor shape: ", tf.shape(measured_phase).numpy())
 print("- reference_class_short tensor shape: ", reference_class_short.shape)
 
 
-#%% Resize images
-x_crop_size = 64
-y_crop_size = 64
-print(measured_phase.shape)
-resize_measured_phase = np.zeros((Nframes, x_crop_size, y_crop_size))
+#%% Crop images
 
-for ii in range(Nframes):
-    resize_measured_phase[ii] = cv2.resize(measured_phase[ii], (x_crop_size, y_crop_size), interpolation = cv2.INTER_NEAREST)
+print("\n### Start of cropping ###")
+crop_measured_phase = tf.image.random_crop(value=measured_phase, size=(frame_number, y_crop_size, x_crop_size))
+# crop_measured_phase = tf.image.stateless_random_crop(value=measured_phase, size=(frame_number, y_crop_size, x_crop_size), seed=(1,0))
+crop_reference_class_short = reference_class_short
+print("First crop done.")
+for ii in range(n_crops_per_image-1):
+    start_time = time.time()
+    crop_measured_phase_temp = tf.image.random_crop(value=measured_phase, size=(frame_number, y_crop_size, x_crop_size))
+    # crop_measured_phase_temp = tf.image.stateless_random_crop(value=measured_phase, size=(frame_number, y_crop_size, x_crop_size), seed=(1,0))
+    crop_measured_phase = np.concatenate((crop_measured_phase, crop_measured_phase_temp))
+    crop_reference_class_short = np.concatenate((crop_reference_class_short, reference_class_short))
+    elapsed_time = time.time() - start_time
+    print("Crop loop number: ", ii)
+    print("  - Number of crops per image: ", n_crops_per_image)
+    print("  - Y and X crop size: ", y_crop_size , x_crop_size)
+    print("  - crop_measured_phase: ", tf.shape(crop_measured_phase).numpy())
+    print("  - crop_reference_class_short: ", crop_reference_class_short.shape)
+    print("  - Time elapsed in this step (s): ", elapsed_time)
+
+# reassign values just to make things works simplier
+measured_phase = crop_measured_phase
+reference_class_short = crop_reference_class_short
+frame_number = frame_number * n_crops_per_image
+print("\nCrop images | New frame_number = (frame_number * number of crops): ", frame_number)
+
+
+#%% Resize images
+print("\n### Start of resizing ###")
+print("measured_phase.shape: ", measured_phase.shape)
+resize_measured_phase = np.zeros((frame_number, y_resize, x_resize))
+
+for ii in range(frame_number):
+    resize_measured_phase[ii] = cv2.resize(measured_phase[ii], (y_resize, x_resize), interpolation = cv2.INTER_NEAREST)
 
 # reassign values just to make things works simplier
 measured_phase = resize_measured_phase
 
-#%% Crop images
-# n_crops_per_image = 10  # number of crops per image
-# x_crop_size = 64  # number of pixels for x axis
-# y_crop_size = 64  # number of pixels for x axis
-# tf.random.set_seed(1234)
-
-# # crop_measured_phase = tf.image.random_crop(value=measured_phase, size=(Nframes, x_crop_size, y_crop_size))
-# crop_measured_phase = tf.image.stateless_random_crop(value=measured_phase, size=(Nframes, x_crop_size, y_crop_size), seed=(1,0))
-# crop_reference_class_short = reference_class_short
-# for ii in range(n_crops_per_image-1):
-#     # crop_measured_phase_temp = tf.image.random_crop(value=measured_phase, size=(Nframes, x_crop_size, y_crop_size))
-#     crop_measured_phase_temp = tf.image.stateless_random_crop(value=measured_phase, size=(Nframes, x_crop_size, y_crop_size), seed=(1,0))
-#     crop_measured_phase = np.concatenate((crop_measured_phase, crop_measured_phase_temp))
-#     crop_reference_class_short = np.concatenate((crop_reference_class_short, reference_class_short))
-
-# print("crop_measured_phase: ", tf.shape(crop_measured_phase).numpy())
-# print("crop_reference_class_short: ", crop_reference_class_short.shape)
-
-# # reassign values just to make things works simplier
-# measured_phase = crop_measured_phase
-# reference_class_short = crop_reference_class_short
-# Nframes = Nframes*n_crops_per_image
-
 
 #%% Split data between Train and Test, then Normalization
 train_set_percentage=0.9 # Set training set percentage
-print(np.int32(Nframes * train_set_percentage))
-print(Nframes-np.int32(Nframes*train_set_percentage))
+print("train_set split number: ", np.int32(frame_number * train_set_percentage))
+print("test_set split number: ", frame_number-np.int32(frame_number*train_set_percentage))
 
-train_measured_phase, test_measured_phase = tf.split(measured_phase, [np.int32(Nframes * train_set_percentage),Nframes - np.int32(Nframes * train_set_percentage)])
-train_reference_class_short, test_reference_class_short = tf.split(reference_class_short, [np.int32(Nframes * train_set_percentage),Nframes-np.int32(Nframes*train_set_percentage)])
+train_measured_phase, test_measured_phase = tf.split(measured_phase, [np.int32(frame_number * train_set_percentage),frame_number - np.int32(frame_number * train_set_percentage)])
+train_reference_class_short, test_reference_class_short = tf.split(reference_class_short, [np.int32(frame_number * train_set_percentage),frame_number-np.int32(frame_number*train_set_percentage)])
 print("- train_measured_phase tensor shape: ", tf.shape(train_measured_phase).numpy())
 print("- test_measured_phase tensor shape: ", tf.shape(test_measured_phase).numpy())
 print("- train_reference_class_short tensor shape: ", tf.shape(train_reference_class_short).numpy())
@@ -189,7 +204,7 @@ test_measured_phase = (test_measured_phase - np.min(test_measured_phase)) / (np.
 
 #%% Create the convolutional base
 model = models.Sequential()
-model.add(layers.Conv2D(32, (3, 3), activation='relu', input_shape=(x_crop_size, y_crop_size,1)))
+model.add(layers.Conv2D(32, (3, 3), activation='relu', input_shape=(y_resize, x_resize,1)))
 model.add(layers.MaxPooling2D((2, 2)))
 model.add(layers.Conv2D(64, (3, 3), activation='relu'))
 model.add(layers.MaxPooling2D((2, 2)))
@@ -200,7 +215,7 @@ model.summary()
 #%% Add Dense layers on top
 model.add(layers.Flatten())
 model.add(layers.Dense(64, activation='relu'))
-model.add(layers.Dense(14)) # TODO change 14 in number of classes 
+model.add(layers.Dense(np.size(classes)))
 # Display the model
 model.summary()
 
@@ -209,7 +224,7 @@ model.compile(optimizer='adam',
               loss=tf.keras.losses.SparseCategoricalCrossentropy(from_logits=True),
               metrics=['accuracy'])
 
-history = model.fit(train_measured_phase, train_reference_class_short, epochs=30, 
+history = model.fit(train_measured_phase, train_reference_class_short, epochs=20, 
                     validation_data=(test_measured_phase, test_reference_class_short))
 
 
@@ -223,7 +238,6 @@ plt.legend(loc='lower right')
 plt.show()
 
 test_loss, test_acc = model.evaluate(test_measured_phase, test_reference_class_short, verbose=2)
-print("test acc: ", test_acc)
+print("test accuracy: ", test_acc)
 
-
-sys.exit()
+sys.exit(0)
