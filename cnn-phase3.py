@@ -16,7 +16,7 @@ from keras import datasets, layers, models
 import numpy as np
 import matplotlib.pyplot as plt
 import os, sys
-import cv2  # resize image wisely
+import cv2  # resize image wisely with opencv
 import time   # compute elapsed time
 
 #%% Parameters
@@ -29,8 +29,8 @@ x_crop_size = 1920  # number of pixels for x axis (width max 1920)
 y_crop_size = 1200  # number of pixels for y axis (high max 1200)
 tf.random.set_seed(1234)  # initialize random seed for tensorflow
 # Resize images parameters
-x_resize = 64  # width
-y_resize = 64  # high
+x_resize = 128  # width
+y_resize = 128  # high
 # ###########################
 
 # Number of RUN
@@ -61,7 +61,7 @@ classes_short=np.arange(np.size(classes))
 measured_phase_input_file = "measured_phase.npy"
 
 # Number of frames
-frame_number=nRUN*np.size(classes)
+frame_number = nRUN * np.size(classes)
 
 # Print values
 print("\n=================================================================")
@@ -121,9 +121,10 @@ for i in range(nRUN):
 #     plt.xticks([])
 #     plt.yticks([])
 #     plt.grid(False)
-#     plt.imshow(measured_phase[i])
-#     plt.xlabel(int(reference_class_short[i]))
+#     plt.imshow(measured_phase[i+222])
+#     plt.xlabel(int(reference_class_short[i+222]))
 # plt.show()
+# sys.exit()
 # # End of plot
 
 # Print arrays dimensions
@@ -132,6 +133,7 @@ print("- reference_class_short tensor shape: ", reference_class_short.shape)
 
 
 #%% Crop images
+# TODO: develop different crop for each image
 
 print("\n### Start of cropping ###")
 crop_measured_phase = tf.image.random_crop(value=measured_phase, size=(frame_number, y_crop_size, x_crop_size))
@@ -185,6 +187,7 @@ measured_phase = resize_measured_phase
 
 
 #%% Split data between Train and Test, then Normalization
+# TODO: Clever split with tensorflow
 print("\n### Splitting data ###")
 train_set_percentage = 0.9  # Set training set percentage
 print("train_set split number: ", np.int32(frame_number * train_set_percentage))
