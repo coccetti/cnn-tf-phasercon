@@ -13,6 +13,7 @@ print("\nTensorflow and Keras versions:")
 print(tf.__version__)
 print(tf.keras.__version__)
 from keras import datasets, layers, models
+# from sklearn.metrics import classification_report
 import numpy as np
 import matplotlib.pyplot as plt
 import os, sys
