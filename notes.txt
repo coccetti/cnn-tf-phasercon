@@ -1,0 +1,15 @@
+Accuracy — This metric measures the proportion of correct predictions made by the model across the entire dataset. 
+It is calculated as the ratio of true positives (TP) and true negatives (TN) to the total number of samples.
+
+Precision — Precision measures the proportion of true positive predictions among all positive predictions made by the model. 
+It is calculated as the ratio of TP to the sum of TP and false positives (FP).
+
+Recall — Recall, also known as sensitivity or true positive rate, measures the proportion of true positive predictions among all actual positive instances. 
+It is calculated as the ratio of TP to the sum of TP and false negatives (FN).
+
+F1 Score — F1 Score is a metric that balances precision and recall. 
+It is calculated as the harmonic mean of precision and recall. 
+F1 Score is useful when seeking a balance between high precision and high recall, as it penalizes extreme negative values of either component.
+
+Accuracy measures the overall correctness of the model's predictions, while precision and recall focus on the quality of positive and negative predictions, respectively. 
+F1 Score provides a balance between precision and recall, making it a more comprehensive metric for evaluating classification models.
