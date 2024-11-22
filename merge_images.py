@@ -4,8 +4,8 @@ import os
 import subprocess
 
 # Path to the Downloads folder
-image_folder = os.path.expanduser('~/Downloads/training3')
-video_name = os.path.expanduser('~/Downloads/training3/o2.mp4')
+image_folder = os.path.expanduser('~/Downloads/cnn_phase5_output_06')
+video_name = os.path.expanduser('~/Downloads/cnn_phase5_output_06/a1.mp4')
 
 # Duration for each image in seconds
 duration = 3

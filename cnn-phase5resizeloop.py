@@ -9,18 +9,31 @@ from keras import datasets, layers, models
 from sklearn.metrics import classification_report
 from keras.losses import SparseCategoricalCrossentropy
 
+# Define the working directory
+base_working_dir = os.path.expanduser('~/Downloads/cnn_phase5_output')
+working_dir = base_working_dir
+counter = 1
+
+# Check if the directory exists and create a new one if it does
+while os.path.exists(working_dir):
+    working_dir = f"{base_working_dir}_{counter:02d}"
+    counter += 1
+
+os.makedirs(working_dir, exist_ok=True)
+
 # Set up logging configuration
-logging.basicConfig(filename='cnn_phase5resizeloop.log', level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+log_file = os.path.join(working_dir, 'cnn_phase5resizeloop.log')
+logging.basicConfig(filename=log_file, level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
 tf.random.set_seed(1234)  # initialize random seed for tensorflow
 
 # Resize images parameters
-x_resize = 128  # width
-y_resize = 128  # high
+x_resize = 256  # width
+y_resize = 256  # high
 
 # Data path
-# data_path = r'/Volumes/EXTERNAL_US/2024_06_12/'
-data_path = r'data3'
+data_path = r'/Volumes/EXTERNAL_US/2024_06_12/'
+# data_path = r'data3'
 
 # Date of measurements
 date=''
@@ -38,20 +51,24 @@ classes=["input_mask_blank_screen",
          "input_mask_checkboard_4A", "input_mask_checkboard_4B"]
 
 # Loop over different nRUN values
-for nRUN in range(30, 31, 10):
-    logging.info(f"\nRunning with nRUN = {nRUN}")
+for num_runs in range(30, 301, 10):
+    logging.info(f"\nRunning with num_runs = {num_runs}")
 
     # Number of frames
-    frame_number = nRUN * np.size(classes)
+    frame_number = num_runs * np.size(classes)
 
     # Log values
     logging.info("\n=================================================================")
     logging.info("Input values: ")
-    logging.info(f" - nRUN: {nRUN}")
+    logging.info(f" - Total number of RUNs: {num_runs}")
     logging.info(f" - Classes in words: {classes}")
     logging.info(f" - Classes in numbers: {np.arange(np.size(classes))}")
     logging.info(f" - Total number of classes: {np.size(classes)}")
-    logging.info(f" - Measured data | frame_number (number of RUNs * number of classes): {frame_number}")
+    logging.info(f" - Total number of frames for measured data (number of RUNs * number of classes): {frame_number}")
+    logging.info(f" - Data path: {data_path}")
+    logging.info(f" - Date of measurements: {date}")
+    logging.info(f" - Type of measure: {data_type_measure}")
+    logging.info(f" - Working directory: {working_dir}")
     logging.info("=================================================================")
 
     # Determine high and width of the matrix reading the data
@@ -66,7 +83,7 @@ for nRUN in range(30, 31, 10):
     reference_class_short = np.zeros((frame_number, 1), dtype=int)
 
     j = 0  # index for frame_number (varies from 0 to frame_number-1)
-    for i in range(nRUN):
+    for i in range(num_runs):
         RUN = 'M0000' + str(i+1)
         if i+1 > 9:
             RUN = 'M000' + str(i+1)
@@ -120,7 +137,7 @@ for nRUN in range(30, 31, 10):
 
     # Compile the model
     model.compile(optimizer='adam',
-                  loss=SparseCategoricalCrossentropy(from_logits=True),
+                  loss=SparseCategoricalCrossentropy(from_logits=False),
                   metrics=['accuracy'])
 
     # Train the model
@@ -135,8 +152,10 @@ for nRUN in range(30, 31, 10):
     plt.ylabel('Accuracy')
     plt.ylim([0.0, 1])
     plt.legend(loc='lower right')
-    plt.title(f'Training and Validation Accuracy for nRUN = {nRUN}')
-    
+    plt.title(f'Training and Validation Accuracy for num_runs = {num_runs}')
+    plt.savefig(os.path.join(working_dir, f'training_validation_accuracy_num_runs_{num_runs}.png'))
+    plt.close()
+
     # Evaluate the model: print the test accuracy
     test_loss, test_acc = model.evaluate(test_measured_phase, test_reference_class_short, verbose=2)
     logging.info(f"test accuracy: {test_acc}")
@@ -147,16 +166,9 @@ for nRUN in range(30, 31, 10):
 
     # Print classification report
     report = classification_report(test_reference_class_short, predicted_classes, target_names=classes, digits=6, output_dict=False)
-    logging.info(report)
+    logging.info("\n" + report)
 
-    # Save classification report to file in Downloads folder
-    downloads_folder = os.path.join(os.path.expanduser('~'), 'Downloads')
-    if not os.path.exists(downloads_folder):
-        os.makedirs(downloads_folder)
-    report_path = os.path.join(downloads_folder, f'classification_report_nRUN_{nRUN}.txt')
+    # Save classification report to file in working directory
+    report_path = os.path.join(working_dir, f'classification_report_num_runs_{num_runs}.txt')
     with open(report_path, 'w') as f:
         f.write(report)
-
-    # Save plot to file in Downloads folder
-    plt.savefig(os.path.join(downloads_folder, f'training_val_acc_{nRUN}nRUN_{x_resize}xres_{y_resize}yres.png'))
-    plt.close()
