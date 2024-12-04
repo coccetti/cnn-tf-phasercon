@@ -1,34 +1,16 @@
-# Description: This script reads measured phase data from a folder structure and resizes it to a given size. 
-#              It then splits the data into training and testing sets, normalizes the pixel values, and uses 
-#              a CNN to predict the classes of the data. The script loops over different values of the number 
-#              of runs and saves the classification report to a file in the working directory.
 import tensorflow as tf
 import numpy as np
 import matplotlib.pyplot as plt
 import os, sys
-from contextlib import redirect_stdout
-import io
 import cv2
 import time
 import logging
 from keras import datasets, layers, models
 from sklearn.metrics import classification_report
 from keras.losses import SparseCategoricalCrossentropy
-from tensorflow.keras.utils import plot_model
-
 
 # Define the working directory
-# Add the current date to the working directory
-base_working_dir = os.path.expanduser('~/Downloads/cnn_phase5_output')
-date = time.strftime("%Y_%m_%d")
-working_dir = os.path.join(base_working_dir, date)
-counter = 1 
-
-# Check if the directory exists and create a new one if it does
-while os.path.exists(working_dir):
-    working_dir = f"{base_working_dir}_{counter:02d}"
-    counter += 1
-
+working_dir = os.path.expanduser('~/cnn_phase5_output_temp')
 os.makedirs(working_dir, exist_ok=True)
 
 # Set up logging configuration
@@ -38,12 +20,12 @@ logging.basicConfig(filename=log_file, level=logging.INFO, format='%(asctime)s -
 tf.random.set_seed(1234)  # initialize random seed for tensorflow
 
 # Resize images parameters
-x_resize = 64  # width
-y_resize = 64  # high
+x_resize = 128  # width
+y_resize = 128  # high
 
 # Data path
-data_path = r'/Volumes/EXTERNAL_US/2024_06_12/'
-# data_path = r'data3'
+# data_path = r'/Volumes/EXTERNAL_US/2024_06_12/'
+data_path = r'data3'
 
 # Date of measurements
 date=''
@@ -61,24 +43,20 @@ classes=["input_mask_blank_screen",
          "input_mask_checkboard_4A", "input_mask_checkboard_4B"]
 
 # Loop over different nRUN values
-for num_runs in range(30, 301, 10):
-    logging.info(f"\nRunning with num_runs = {num_runs}")
+for nRUN in range(30, 31, 30):
+    logging.info(f"\nRunning with nRUN = {nRUN}")
 
     # Number of frames
-    frame_number = num_runs * np.size(classes)
+    frame_number = nRUN * np.size(classes)
 
     # Log values
     logging.info("\n=================================================================")
     logging.info("Input values: ")
-    logging.info(f" - Total number of RUNs: {num_runs}")
+    logging.info(f" - nRUN: {nRUN}")
     logging.info(f" - Classes in words: {classes}")
     logging.info(f" - Classes in numbers: {np.arange(np.size(classes))}")
     logging.info(f" - Total number of classes: {np.size(classes)}")
-    logging.info(f" - Total number of frames for measured data (number of RUNs * number of classes): {frame_number}")
-    logging.info(f" - Data path: {data_path}")
-    logging.info(f" - Date of measurements: {date}")
-    logging.info(f" - Type of measure: {data_type_measure}")
-    logging.info(f" - Working directory: {working_dir}")
+    logging.info(f" - Measured data | frame_number (number of RUNs * number of classes): {frame_number}")
     logging.info("=================================================================")
 
     # Determine high and width of the matrix reading the data
@@ -93,7 +71,7 @@ for num_runs in range(30, 301, 10):
     reference_class_short = np.zeros((frame_number, 1), dtype=int)
 
     j = 0  # index for frame_number (varies from 0 to frame_number-1)
-    for i in range(num_runs):
+    for i in range(nRUN):
         RUN = 'M0000' + str(i+1)
         if i+1 > 9:
             RUN = 'M000' + str(i+1)
@@ -136,8 +114,8 @@ for num_runs in range(30, 301, 10):
     model = models.Sequential()
     model.add(layers.Conv2D(32, (3, 3), activation='relu', input_shape=(y_resize, x_resize, 1)))
     model.add(layers.MaxPooling2D((2, 2)))
-    # model.add(layers.Conv2D(64, (3, 3), activation='relu'))
-    # model.add(layers.MaxPooling2D((2, 2)))
+    model.add(layers.Conv2D(64, (3, 3), activation='relu'))
+    model.add(layers.MaxPooling2D((2, 2)))
     model.add(layers.Conv2D(64, (3, 3), activation='relu'))
 
     # Add Dense layers on top
@@ -145,17 +123,9 @@ for num_runs in range(30, 301, 10):
     model.add(layers.Dense(64, activation='relu'))
     model.add(layers.Dense(np.size(classes), activation='softmax'))
 
-    # Print model summary to a variable
-    summary_str = io.StringIO()
-    with redirect_stdout(summary_str):
-        model.summary()
-    summary = summary_str.getvalue()
-    logging.info(f"\n{summary}")
-
-    # Save model architecture as an image
-    plot_model(model, 
-               to_file=os.path.join(working_dir, f'model_architecture_num_runs_{num_runs}.png'), 
-               show_shapes=True, show_layer_names=True)
+    # Print model summary
+    summary = model.summary()
+    logging.info(summary)
 
     # Compile the model
     model.compile(optimizer='adam',
@@ -174,8 +144,8 @@ for num_runs in range(30, 301, 10):
     plt.ylabel('Accuracy')
     plt.ylim([0.0, 1])
     plt.legend(loc='lower right')
-    plt.title(f'Training and Validation Accuracy for num_runs = {num_runs}')
-    plt.savefig(os.path.join(working_dir, f'training_validation_accuracy_num_runs_{num_runs}.png'))
+    plt.title(f'Training and Validation Accuracy for nRUN = {nRUN}')
+    plt.savefig(os.path.join(working_dir, f'training_validation_accuracy_nRUN_{nRUN}.png'))
     plt.close()
 
     # Evaluate the model: print the test accuracy
@@ -188,9 +158,22 @@ for num_runs in range(30, 301, 10):
 
     # Print classification report
     report = classification_report(test_reference_class_short, predicted_classes, target_names=classes, digits=6, output_dict=False)
-    logging.info("\n" + report)
+    logging.info(report)
 
     # Save classification report to file in working directory
-    report_path = os.path.join(working_dir, f'classification_report_num_runs_{num_runs}.txt')
+    report_path = os.path.join(working_dir, f'classification_report_nRUN_{nRUN}.txt')
     with open(report_path, 'w') as f:
         f.write(report)
+
+    # Visualize the filters of the first convolutional layer
+    filters, biases = model.layers[4].get_weights()
+    filters = (filters - filters.min()) / (filters.max() - filters.min())  # Normalize to [0, 1]
+
+    n_filters = filters.shape[-1]
+    fig, axes = plt.subplots(1, n_filters, figsize=(20, 20))
+    for i in range(n_filters):
+        ax = axes[i]
+        ax.imshow(filters[:, :, 0, i], cmap='viridis')
+        ax.axis('off')
+    plt.savefig(os.path.join(working_dir, f'filters_conv3_nRUN_{nRUN}.png'))
+    plt.close()
