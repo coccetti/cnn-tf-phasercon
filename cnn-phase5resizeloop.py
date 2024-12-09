@@ -11,25 +11,31 @@ import io
 import cv2
 import time
 import logging
+import shutil
 from keras import datasets, layers, models
 from sklearn.metrics import classification_report
 from keras.losses import SparseCategoricalCrossentropy
 from tensorflow.keras.utils import plot_model
 
-
-# Define the working directory
-# Add the current date to the working directory
+# Define the base working directory
 base_working_dir = os.path.expanduser('~/Downloads/cnn_phase5_output')
-date = time.strftime("%Y_%m_%d")
-working_dir = os.path.join(base_working_dir, date)
+
+# Add the current date to the working directory
+current_time = time.strftime("%Y_%m_%d")
+working_dir = os.path.join(base_working_dir, f'ccn_phase_5_{current_time}')
 counter = 1 
 
 # Check if the directory exists and create a new one if it does
 while os.path.exists(working_dir):
-    working_dir = f"{base_working_dir}_{counter:02d}"
+    working_dir = os.path.join(base_working_dir, f'ccn_phase_5_{current_time}_{counter:02d}')
     counter += 1
 
 os.makedirs(working_dir, exist_ok=True)
+print(f"Working directory: {working_dir}")
+
+# Copy the current script file to the working directory
+current_script = os.path.abspath(__file__)
+shutil.copy(current_script, working_dir)
 
 # Set up logging configuration
 log_file = os.path.join(working_dir, 'cnn_phase5resizeloop.log')
@@ -38,8 +44,8 @@ logging.basicConfig(filename=log_file, level=logging.INFO, format='%(asctime)s -
 tf.random.set_seed(1234)  # initialize random seed for tensorflow
 
 # Resize images parameters
-x_resize = 64  # width
-y_resize = 64  # high
+x_resize = 128  # width
+y_resize = 128  # high
 
 # Data path
 data_path = r'/Volumes/EXTERNAL_US/2024_06_12/'
@@ -62,6 +68,8 @@ classes=["input_mask_blank_screen",
 
 # Loop over different nRUN values
 for num_runs in range(30, 301, 10):
+    start_time = time.time()  # Record the start time
+    logging.info("\nstart_time: " + time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(start_time)))
     logging.info(f"\nRunning with num_runs = {num_runs}")
 
     # Number of frames
@@ -136,9 +144,18 @@ for num_runs in range(30, 301, 10):
     model = models.Sequential()
     model.add(layers.Conv2D(32, (3, 3), activation='relu', input_shape=(y_resize, x_resize, 1)))
     model.add(layers.MaxPooling2D((2, 2)))
+    model.add(layers.Conv2D(64, (3, 3), activation='relu'))
+
+    # model.add(layers.MaxPooling2D((2, 2)))
+    # model.add(layers.Conv2D(64, (3, 3), activation='relu'))
+
+    # # <- Add more Conv2D and MaxPooling2D layers here
+    # model.add(layers.MaxPooling2D((2, 2)))
     # model.add(layers.Conv2D(64, (3, 3), activation='relu'))
     # model.add(layers.MaxPooling2D((2, 2)))
-    model.add(layers.Conv2D(64, (3, 3), activation='relu'))
+    # model.add(layers.Conv2D(64, (3, 3), activation='relu'))
+    # model.add(layers.MaxPooling2D((2, 2)))
+    # model.add(layers.Conv2D(64, (3, 3), activation='relu'))
 
     # Add Dense layers on top
     model.add(layers.Flatten())
@@ -159,7 +176,7 @@ for num_runs in range(30, 301, 10):
 
     # Compile the model
     model.compile(optimizer='adam',
-                  loss=SparseCategoricalCrossentropy(from_logits=False),
+                  loss=SparseCategoricalCrossentropy(from_logits=True),
                   metrics=['accuracy'])
 
     # Train the model
@@ -194,3 +211,8 @@ for num_runs in range(30, 301, 10):
     report_path = os.path.join(working_dir, f'classification_report_num_runs_{num_runs}.txt')
     with open(report_path, 'w') as f:
         f.write(report)
+
+    # Record the end time for each loop
+    end_time = time.time()
+    logging.info("\nend_time: " + time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(end_time)))
+    logging.info(f"\nTime elapsed for num_runs = {num_runs}: {end_time - start_time} seconds")
