@@ -13,3 +13,7 @@ F1 Score is useful when seeking a balance between high precision and high recall
 
 Accuracy measures the overall correctness of the model's predictions, while precision and recall focus on the quality of positive and negative predictions, respectively. 
 F1 Score provides a balance between precision and recall, making it a more comprehensive metric for evaluating classification models.
+
+========
+Pytorch
+========
