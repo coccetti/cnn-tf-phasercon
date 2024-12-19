@@ -186,7 +186,7 @@ for num_runs in range(250, 251, 10):
     # Save model architecture as an image
     plot_model(model, 
                to_file=os.path.join(working_dir, f'model_architecture_num_runs_{num_runs}.png'), 
-               show_shapes=True, show_layer_names=True)
+               show_shapes=True, show_layer_names=True, expand_nested=True)
 
     # Compile the model
     model.compile(optimizer='adam',
