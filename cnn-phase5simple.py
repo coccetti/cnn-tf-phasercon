@@ -16,7 +16,7 @@ import shutil
 from keras import datasets, layers, models
 from sklearn.metrics import classification_report
 from keras.losses import SparseCategoricalCrossentropy
-from tensorflow.keras.utils import plot_model
+from keras.utils.vis_utils import plot_model
 from plot_functions.plot_f1_txt_report import plot_classification_metrics
 
 # Define the base working directory
@@ -69,7 +69,7 @@ classes=["input_mask_blank_screen",
          "input_mask_checkboard_4A", "input_mask_checkboard_4B"]
 
 # Loop over different nRUN values
-for num_runs in range(250, 251, 10):
+for num_runs in range(30, 31, 10):
     start_time = time.time()  # Record the start time
     logging.info("\nstart_time: " + time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(start_time)))
     logging.info(f"\nRunning with num_runs = {num_runs}")
