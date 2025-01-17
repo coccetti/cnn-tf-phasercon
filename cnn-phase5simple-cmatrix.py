@@ -21,7 +21,7 @@ from tqdm import tqdm
 from keras.losses import SparseCategoricalCrossentropy
 from keras.utils.vis_utils import plot_model
 from plot_functions.plot_f1_txt_report import plot_classification_metrics
-from plot_functions.plot_confusion_matrix import plot_confusion_matrix
+from plot_functions.plot_confusion_matrix import plot_confusion_matrix, plot_percent_confusion_matrix
 
 # Define the base working directory
 base_working_dir = os.path.expanduser('~/Downloads/cnn_phase5_1layer')
@@ -72,7 +72,9 @@ classes=["input_mask_blank_screen",
          "input_mask_checkboard_3A", "input_mask_checkboard_3B",
          "input_mask_checkboard_4A", "input_mask_checkboard_4B"]
 
-# Loop over different nRUN values
+# Loop over different num_runs values                                          #
+# Number of runs                                                               #
+# ##############################################################################
 for num_runs in range(250, 251, 10):
     start_time = time.time()  # Record the start time
     logging.info("\nstart_time: " + time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(start_time)))
@@ -234,6 +236,7 @@ for num_runs in range(250, 251, 10):
 
     # Plot confusion matrix
     plot_confusion_matrix(working_dir, test_reference_class_short, predicted_classes, classes, title='')
+    plot_percent_confusion_matrix(working_dir, test_reference_class_short, predicted_classes, classes, title='')
 
     # Record the end time for each loop
     end_time = time.time()
