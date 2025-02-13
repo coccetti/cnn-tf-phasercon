@@ -51,7 +51,9 @@ tf.random.set_seed(1234)  # initialize random seed for tensorflow
 
 # Resize images parameters
 x_resize = 128  # width
+# x_resize = 8  # width
 y_resize = 128  # high
+# y_resize = 8  # high
 
 # Data path
 data_path = r'/Volumes/EXTERNAL_US/2024_06_12/'
