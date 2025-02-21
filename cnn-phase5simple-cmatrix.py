@@ -51,9 +51,7 @@ tf.random.set_seed(1234)  # initialize random seed for tensorflow
 
 # Resize images parameters
 x_resize = 128  # width
-# x_resize = 8  # width
 y_resize = 128  # high
-# y_resize = 8  # high
 
 # Data path
 data_path = r'/Volumes/EXTERNAL_US/2024_06_12/'
@@ -77,7 +75,7 @@ classes=["input_mask_blank_screen",
 # Loop over different num_runs values                                          #
 # Number of runs                                                               #
 # ##############################################################################
-for num_runs in range(250, 251, 10):
+for num_runs in range(330, 331, 10):
     start_time = time.time()  # Record the start time
     logging.info("\nstart_time: " + time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(start_time)))
     logging.info(f"\nRunning with num_runs = {num_runs}")
