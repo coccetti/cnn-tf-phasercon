@@ -17,6 +17,19 @@ import logging
 import shutil
 from sklearn.metrics import classification_report
 
+# Check that MPS is available
+if not torch.backends.mps.is_available():
+    if not torch.backends.mps.is_built():
+        print("MPS not available because the current PyTorch install was not "
+              "built with MPS enabled.")
+    else:
+        print("MPS not available because the current MacOS version is not 12.3+ "
+              "and/or you do not have an MPS-enabled device on this machine.")
+
+else:
+    mps_device = torch.device("mps")
+    print(f"Using MPS device: {mps_device}")
+
 # Define the base working directory
 base_working_dir = os.path.expanduser('~/Downloads/cnn_phase5_output')
 
@@ -69,6 +82,7 @@ for num_runs in range(30, 301, 10):
     start_time = time.time()  # Record the start time
     logging.info("\nstart_time: " + time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(start_time)))
     logging.info(f"\nRunning with num_runs = {num_runs}")
+    print(f"\nRunning with num_runs = {num_runs}")
 
     # Number of frames
     frame_number = num_runs * np.size(classes)
@@ -171,6 +185,14 @@ for num_runs in range(30, 301, 10):
 
     # Initialize the model, loss function, and optimizer
     model = CNN()
+    if torch.backends.mps.is_available():
+        model.to(mps_device)
+        logging.info(f"Using MPS device: {mps_device}")
+        print(f"Using MPS device: {mps_device}")
+    else:
+        model.to(torch.device("cpu"))
+        logging.info("Using CPU device")
+        print("Using CPU device")   
     criterion = nn.CrossEntropyLoss()
     optimizer = optim.Adam(model.parameters(), lr=0.001)
 
@@ -180,6 +202,10 @@ for num_runs in range(30, 301, 10):
         model.train()
         running_loss = 0.0
         for inputs, labels in train_loader:
+            # Move data to the appropriate device
+            inputs = inputs.to(mps_device if torch.backends.mps.is_available() else torch.device("cpu"))
+            labels = labels.to(mps_device if torch.backends.mps.is_available() else torch.device("cpu"))
+            
             optimizer.zero_grad()
             outputs = model(inputs)
             loss = criterion(outputs, labels)
@@ -194,6 +220,10 @@ for num_runs in range(30, 301, 10):
     total = 0
     with torch.no_grad():
         for inputs, labels in test_loader:
+            # Move data to the appropriate device
+            inputs = inputs.to(mps_device if torch.backends.mps.is_available() else torch.device("cpu"))
+            labels = labels.to(mps_device if torch.backends.mps.is_available() else torch.device("cpu"))
+            
             outputs = model(inputs)
             _, predicted = torch.max(outputs.data, 1)
             total += labels.size(0)
@@ -205,11 +235,15 @@ for num_runs in range(30, 301, 10):
     y_pred = []
     with torch.no_grad():
         for inputs, labels in test_loader:
+            # Move data to the appropriate device
+            inputs = inputs.to(mps_device if torch.backends.mps.is_available() else torch.device("cpu"))
+            labels = labels.to(mps_device if torch.backends.mps.is_available() else torch.device("cpu"))
+            
             outputs = model(inputs)
             _, predicted = torch.max(outputs.data, 1)
             y_true.extend(labels.cpu().numpy())
             y_pred.extend(predicted.cpu().numpy())
-    report = classification_report(y_true, y_pred, target_names=classes, digits=6)
+    report = classification_report(y_true, y_pred, target_names=classes, digits=6, zero_division=0)
     logging.info("\n" + report)
 
     # Save classification report to file in working directory
