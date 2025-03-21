@@ -20,6 +20,7 @@ import shutil
 from torchvision import transforms
 from tqdm import tqdm
 import matplotlib.patches as patches
+from torchviz import make_dot
 
 # Check that MPS is available
 if not torch.backends.mps.is_available():
@@ -64,8 +65,8 @@ x_resize = 128  # width
 y_resize = 128  # high
 
 # Data path
-data_path = r'/Volumes/EXTERNAL_US/2024_06_12/'
-# data_path = r'data3'
+# data_path = r'/Volumes/EXTERNAL_US/2024_06_12/'
+data_path = r'data3'
 
 # Date of measurements
 date=''
@@ -95,8 +96,8 @@ config = {
 }
 
 # Define num_runs range parameters
-num_runs_start = 600
-num_runs_end = 600
+num_runs_start = 30
+num_runs_end = 30
 num_runs_step = 10
 
 class MemoryEfficientPhaseDataset(Dataset):
@@ -147,7 +148,7 @@ train_transform = transforms.Compose([
     transforms.Normalize((0.5,), (0.5,))
 ])
 
-def visualize_cnn_architecture(save_path):
+def visualize_cnn_architecture(save_path, model):
     """Create an improved visual representation of the CNN architecture."""
     # Create figure with white background
     fig = plt.figure(figsize=(24, 12), facecolor='white')
@@ -291,9 +292,12 @@ def visualize_cnn_architecture(save_path):
              bbox_to_anchor=(0.5, -0.05), ncol=len(colors),
              frameon=True, fancybox=True, shadow=True)
     
+    # Calculate total trainable parameters
+    total_params = sum(p.numel() for p in model.parameters() if p.requires_grad)
+    
     # Add network details
     details = (
-        f"Total Parameters: {sum(p.numel() for p in model.parameters()):,}\n"
+        f"Total Trainable Parameters: {total_params:,}\n"
         f"Input Size: {dimensions['input'][0]}×{dimensions['input'][1]}×{dimensions['input'][2]}\n"
         f"Output Classes: {len(classes)}"
     )
@@ -301,6 +305,305 @@ def visualize_cnn_architecture(save_path):
     
     # Save with high quality
     plt.savefig(save_path, dpi=300, bbox_inches='tight', pad_inches=0.5)
+    plt.close()
+
+def visualize_cnn_torchviz(model, save_path):
+    """Create a detailed visualization of the CNN using torchviz."""
+    # Create a dummy input with the correct shape
+    x = torch.randn(1, 1, 128, 128).to(next(model.parameters()).device)
+    
+    # Get the output for this input
+    y = model(x)
+    
+    # Create the dot graph
+    dot = make_dot(y, params=dict(model.named_parameters()))
+    
+    # Customize the graph
+    dot.attr(rankdir='TB')  # Top to bottom layout
+    dot.attr('node', shape='box')
+    
+    # Save the visualization
+    dot.render(save_path, format='png', cleanup=True)
+    print(f"Saved torchviz visualization to {save_path}.png")
+
+def visualize_cnn_detailed(model, save_path):
+    """Create a detailed, modern visualization of the CNN architecture."""
+    plt.style.use('default')
+    fig = plt.figure(figsize=(20, 12), facecolor='white')
+    
+    # Create main axis for the architecture
+    gs = plt.GridSpec(2, 1, height_ratios=[4, 1], hspace=0.3)
+    ax_main = plt.subplot(gs[0])
+    ax_info = plt.subplot(gs[1])
+    
+    # Modern color palette
+    colors = {
+        'conv': '#FF6B6B',      # Coral red
+        'pool': '#4ECDC4',      # Turquoise
+        'fc': '#45B7D1',        # Sky blue
+        'input': '#96CEB4',     # Sage green
+        'dropout': '#FFBE0B',   # Golden yellow
+        'activation': '#9D4EDD', # Purple
+        'norm': '#2EC4B6'       # Teal
+    }
+    
+    # Layer dimensions and configurations
+    layer_configs = [
+        {'name': 'Input', 'type': 'input', 'shape': (128, 128, 1)},
+        {'name': 'Conv1', 'type': 'conv', 'shape': (128, 128, 32), 'kernel': 3, 'params': 320},
+        {'name': 'BN1', 'type': 'norm', 'shape': (128, 128, 32)},
+        {'name': 'Pool1', 'type': 'pool', 'shape': (64, 64, 32)},
+        {'name': 'Conv2', 'type': 'conv', 'shape': (64, 64, 64), 'kernel': 3, 'params': 18496},
+        {'name': 'BN2', 'type': 'norm', 'shape': (64, 64, 64)},
+        {'name': 'Pool2', 'type': 'pool', 'shape': (32, 32, 64)},
+        {'name': 'Conv3', 'type': 'conv', 'shape': (32, 32, 128), 'kernel': 3, 'params': 73856},
+        {'name': 'BN3', 'type': 'norm', 'shape': (32, 32, 128)},
+        {'name': 'Pool3', 'type': 'pool', 'shape': (16, 16, 128)},
+        {'name': 'Dropout1', 'type': 'dropout', 'rate': 0.25},
+        {'name': 'Flatten', 'type': 'fc', 'shape': (32768,)},
+        {'name': 'FC1', 'type': 'fc', 'shape': (512,), 'params': 16777728},
+        {'name': 'Dropout2', 'type': 'dropout', 'rate': 0.5},
+        {'name': 'FC2', 'type': 'fc', 'shape': (len(classes),), 'params': 7182}
+    ]
+    
+    def add_layer_block(x, y, width, height, color, alpha=0.7):
+        rect = patches.Rectangle((x, y), width, height, facecolor=color, alpha=alpha,
+                               edgecolor='black', linewidth=1, zorder=1)
+        ax_main.add_patch(rect)
+        return rect
+    
+    # Starting positions and dimensions
+    x = 0.05
+    base_y = 0.5
+    block_width = 0.06
+    spacing = 0.04
+    max_height = 0.3
+    
+    # Draw layers
+    for i, layer in enumerate(layer_configs):
+        # Adjust height based on layer type
+        if layer['type'] == 'input':
+            height = max_height
+        elif layer['type'] == 'conv':
+            height = max_height * 0.9
+        elif layer['type'] == 'pool':
+            height = max_height * 0.7
+        elif layer['type'] == 'fc':
+            height = max_height * 0.5
+        else:
+            height = max_height * 0.4
+        
+        # Add block
+        add_layer_block(x, base_y - height/2, block_width, height, colors[layer['type']])
+        
+        # Add layer name
+        ax_main.text(x + block_width/2, base_y + height/2 + 0.02, layer['name'],
+                    ha='center', va='bottom', fontsize=9, rotation=0)
+        
+        # Add shape information
+        if 'shape' in layer:
+            shape_text = '×'.join(str(x) for x in layer['shape'])
+            ax_main.text(x + block_width/2, base_y - height/2 - 0.02,
+                        shape_text, ha='center', va='top', fontsize=8)
+        
+        # Add additional info (kernel size, dropout rate)
+        if 'kernel' in layer:
+            ax_main.text(x + block_width/2, base_y,
+                        f'{layer["kernel"]}×{layer["kernel"]}', ha='center', va='center', fontsize=8)
+        elif 'rate' in layer:
+            ax_main.text(x + block_width/2, base_y,
+                        f'p={layer["rate"]}', ha='center', va='center', fontsize=8)
+        
+        # Add arrow to next layer
+        if i < len(layer_configs) - 1:
+            ax_main.arrow(x + block_width, base_y,
+                         spacing, 0, head_width=0.015, head_length=0.01,
+                         fc='black', ec='black', zorder=0)
+        
+        x += block_width + spacing
+    
+    # Set main plot properties
+    ax_main.set_xlim(0, 1)
+    ax_main.set_ylim(0, 1)
+    ax_main.axis('off')
+    
+    # Add title
+    ax_main.set_title('CNN Architecture for Phase Classification', pad=20, size=14, fontweight='bold')
+    
+    # Add legend
+    legend_elements = [
+        patches.Patch(facecolor=color, edgecolor='black', label=layer_type.capitalize())
+        for layer_type, color in colors.items()
+    ]
+    ax_main.legend(handles=legend_elements, loc='upper center', 
+                  bbox_to_anchor=(0.5, -0.1), ncol=len(colors),
+                  frameon=True, fancybox=True, shadow=True)
+    
+    # Add network statistics in the bottom subplot
+    ax_info.axis('off')
+    total_params = sum(p.numel() for p in model.parameters() if p.requires_grad)
+    trainable_params = sum(p.numel() for p in model.parameters() if p.requires_grad)
+    
+    info_text = (
+        f"Network Statistics:\n"
+        f"Total Parameters: {total_params:,}\n"
+        f"Trainable Parameters: {trainable_params:,}\n"
+        f"Input Size: 128×128×1\n"
+        f"Output Classes: {len(classes)}\n"
+        f"Number of Convolutional Layers: 3\n"
+        f"Number of Fully Connected Layers: 2"
+    )
+    
+    ax_info.text(0.02, 0.6, info_text, fontsize=10, 
+                 bbox=dict(facecolor='white', edgecolor='gray', alpha=0.8))
+    
+    # Save with high quality
+    plt.savefig(save_path, dpi=300, bbox_inches='tight', pad_inches=0.5)
+    plt.close()
+
+def plot_training_metrics(epochs, train_losses, val_losses, train_accuracies, val_accuracies, learning_rates, num_runs, save_dir):
+    """Plot comprehensive training metrics."""
+    # Create a figure with multiple subplots
+    fig = plt.figure(figsize=(15, 10))
+    gs = plt.GridSpec(2, 2, figure=fig)
+    
+    # 1. Accuracy Plot
+    ax1 = fig.add_subplot(gs[0, 0])
+    ax1.plot(epochs, train_accuracies, 'b-', label='Training')
+    ax1.plot(epochs, val_accuracies, 'r-', label='Validation')
+    ax1.set_title('Model Accuracy')
+    ax1.set_xlabel('Epoch')
+    ax1.set_ylabel('Accuracy (%)')
+    ax1.legend()
+    ax1.grid(True)
+    
+    # 2. Loss Plot
+    ax2 = fig.add_subplot(gs[0, 1])
+    ax2.plot(epochs, train_losses, 'b-', label='Training')
+    ax2.plot(epochs, val_losses, 'r-', label='Validation')
+    ax2.set_title('Model Loss')
+    ax2.set_xlabel('Epoch')
+    ax2.set_ylabel('Loss')
+    ax2.legend()
+    ax2.grid(True)
+    
+    # 3. Learning Rate Plot
+    ax3 = fig.add_subplot(gs[1, 0])
+    ax3.plot(epochs, learning_rates, 'g-')
+    ax3.set_title('Learning Rate')
+    ax3.set_xlabel('Epoch')
+    ax3.set_ylabel('Learning Rate')
+    ax3.set_yscale('log')
+    ax3.grid(True)
+    
+    # 4. Training Progress
+    ax4 = fig.add_subplot(gs[1, 1])
+    progress_data = {
+        'Final Train Acc': train_accuracies[-1],
+        'Final Val Acc': val_accuracies[-1],
+        'Best Val Acc': max(val_accuracies),
+        'Final Train Loss': train_losses[-1],
+        'Final Val Loss': val_losses[-1],
+        'Best Val Loss': min(val_losses)
+    }
+    y_pos = np.arange(len(progress_data))
+    ax4.barh(y_pos, list(progress_data.values()))
+    ax4.set_yticks(y_pos)
+    ax4.set_yticklabels(list(progress_data.keys()))
+    ax4.set_title('Training Summary')
+    
+    plt.tight_layout()
+    plt.savefig(os.path.join(save_dir, f'training_metrics_num_runs_{num_runs}.png'), dpi=300, bbox_inches='tight')
+    plt.close()
+
+def visualize_feature_maps(model, sample_input, save_path):
+    """Visualize feature maps from different layers of the CNN."""
+    model.eval()
+    
+    # Register hooks to get intermediate activations
+    activations = {}
+    def get_activation(name):
+        def hook(model, input, output):
+            activations[name] = output.detach()
+        return hook
+    
+    # Register hooks for convolutional layers
+    for name, layer in model.named_modules():
+        if isinstance(layer, nn.Conv2d):
+            layer.register_forward_hook(get_activation(name))
+    
+    # Forward pass
+    with torch.no_grad():
+        output = model(sample_input)
+    
+    # Create visualization
+    fig = plt.figure(figsize=(15, 5 * len(activations)))
+    for idx, (name, activation) in enumerate(activations.items()):
+        # Get the first sample and first few channels
+        act = activation[0].cpu()
+        n_channels = min(8, act.shape[0])
+        
+        for i in range(n_channels):
+            plt.subplot(len(activations), 8, idx * 8 + i + 1)
+            plt.imshow(act[i], cmap='viridis')
+            if i == 0:
+                plt.ylabel(f'Layer {name}')
+            plt.xticks([])
+            plt.yticks([])
+    
+    plt.suptitle('Feature Maps Visualization', size=16)
+    plt.tight_layout()
+    plt.savefig(save_path, dpi=300, bbox_inches='tight')
+    plt.close()
+
+def plot_parameter_distributions(model, save_path):
+    """Plot the distribution of parameters in each layer."""
+    plt.figure(figsize=(15, 10))
+    
+    # Collect parameters from each layer
+    layer_params = {}
+    for name, param in model.named_parameters():
+        if param.requires_grad:
+            layer_params[name] = param.data.cpu().numpy().flatten()
+    
+    # Create violin plots
+    plt.violinplot(list(layer_params.values()))
+    plt.xticks(range(1, len(layer_params) + 1), list(layer_params.keys()), rotation=45)
+    plt.title('Parameter Distributions Across Layers')
+    plt.ylabel('Parameter Value')
+    plt.grid(True, axis='y')
+    
+    plt.tight_layout()
+    plt.savefig(save_path, dpi=300, bbox_inches='tight')
+    plt.close()
+
+def plot_gradient_flow(model, save_path):
+    """Plot the gradient flow through the network layers."""
+    named_parameters = [(name, param) for name, param in model.named_parameters() if param.requires_grad and param.grad is not None]
+    
+    plt.figure(figsize=(15, 10))
+    ave_grads = []
+    max_grads = []
+    layers = []
+    
+    for n, p in named_parameters:
+        layers.append(n)
+        ave_grads.append(p.grad.abs().mean().cpu())
+        max_grads.append(p.grad.abs().max().cpu())
+    
+    plt.bar(np.arange(len(max_grads)), max_grads, alpha=0.1, lw=1, color="c")
+    plt.bar(np.arange(len(max_grads)), ave_grads, alpha=0.1, lw=1, color="b")
+    plt.hlines(0, 0, len(ave_grads)+1, lw=2, color="k")
+    plt.xticks(range(0,len(ave_grads), 1), layers, rotation="vertical")
+    plt.xlim(left=0, right=len(ave_grads))
+    plt.ylim(bottom = -0.001, top=0.02)
+    plt.xlabel("Layers")
+    plt.ylabel("Average gradient")
+    plt.title("Gradient flow")
+    plt.grid(True)
+    
+    plt.tight_layout()
+    plt.savefig(save_path, dpi=300, bbox_inches='tight')
     plt.close()
 
 # Loop over different nRUN values
@@ -393,6 +696,9 @@ for num_runs in range(num_runs_start, num_runs_end + 1, num_runs_step):
         # Lists to store metrics
         train_accuracies = []
         val_accuracies = []
+        train_losses = []
+        val_losses = []
+        learning_rates = []
         epochs = []
         
         for epoch in range(config['n_epochs']):
@@ -401,8 +707,9 @@ for num_runs in range(num_runs_start, num_runs_end + 1, num_runs_step):
             train_loss = 0.0
             train_correct = 0
             train_total = 0
-            train_pbar = tqdm(train_loader, desc=f'Epoch {epoch+1}/{config["n_epochs"]} [Train]')
+            batch_losses = []
             
+            train_pbar = tqdm(train_loader, desc=f'Epoch {epoch+1}/{config["n_epochs"]} [Train]')
             for inputs, labels in train_pbar:
                 inputs, labels = inputs.to(device), labels.to(device)
                 
@@ -412,12 +719,13 @@ for num_runs in range(num_runs_start, num_runs_end + 1, num_runs_step):
                 loss.backward()
                 optimizer.step()
                 
-                train_loss += loss.item()
+                batch_losses.append(loss.item())
                 _, predicted = torch.max(outputs.data, 1)
                 train_total += labels.size(0)
                 train_correct += (predicted == labels).sum().item()
                 train_pbar.set_postfix({'loss': f'{loss.item():.4f}'})
             
+            train_loss = np.mean(batch_losses)
             train_accuracy = 100 * train_correct / train_total
             
             # Validation phase
@@ -425,6 +733,7 @@ for num_runs in range(num_runs_start, num_runs_end + 1, num_runs_step):
             val_loss = 0.0
             val_correct = 0
             val_total = 0
+            batch_losses = []
             
             with torch.no_grad():
                 val_pbar = tqdm(val_loader, desc=f'Epoch {epoch+1}/{config["n_epochs"]} [Val]')
@@ -432,26 +741,28 @@ for num_runs in range(num_runs_start, num_runs_end + 1, num_runs_step):
                     inputs, labels = inputs.to(device), labels.to(device)
                     outputs = model(inputs)
                     loss = criterion(outputs, labels)
-                    val_loss += loss.item()
+                    batch_losses.append(loss.item())
                     
                     _, predicted = torch.max(outputs.data, 1)
                     val_total += labels.size(0)
                     val_correct += (predicted == labels).sum().item()
-                    
                     val_pbar.set_postfix({'loss': f'{loss.item():.4f}'})
             
-            val_loss = val_loss / len(val_loader)
+            val_loss = np.mean(batch_losses)
             val_accuracy = 100 * val_correct / val_total
             
             # Store metrics
             epochs.append(epoch + 1)
             train_accuracies.append(train_accuracy)
             val_accuracies.append(val_accuracy)
+            train_losses.append(train_loss)
+            val_losses.append(val_loss)
+            learning_rates.append(optimizer.param_groups[0]['lr'])
             
             # Print epoch metrics
             print(f'Epoch {epoch+1}/{config["n_epochs"]}:')
-            print(f'Train Accuracy: {train_accuracy:.2f}%')
-            print(f'Validation Accuracy: {val_accuracy:.2f}%')
+            print(f'Train Loss: {train_loss:.4f}, Train Accuracy: {train_accuracy:.2f}%')
+            print(f'Val Loss: {val_loss:.4f}, Val Accuracy: {val_accuracy:.2f}%')
             
             # Learning rate scheduling
             scheduler.step(val_loss)
@@ -466,41 +777,45 @@ for num_runs in range(num_runs_start, num_runs_end + 1, num_runs_step):
             if val_loss < best_val_loss:
                 best_val_loss = val_loss
                 torch.save(model.state_dict(), os.path.join(working_dir, 'best_model.pth'))
+                
+                # Plot feature maps for best model
+                if epoch > 0:  # Skip first epoch
+                    visualize_feature_maps(model, inputs[:1], 
+                                        os.path.join(working_dir, f'feature_maps_epoch_{epoch+1}.png'))
+                    
+                    # Plot parameter distributions
+                    plot_parameter_distributions(model, 
+                                              os.path.join(working_dir, f'parameter_distributions_epoch_{epoch+1}.png'))
+                    
+                    # Plot gradient flow
+                    plot_gradient_flow(model, 
+                                     os.path.join(working_dir, f'gradient_flow_epoch_{epoch+1}.png'))
         
-        return epochs, train_accuracies, val_accuracies
+        return epochs, train_losses, val_losses, train_accuracies, val_accuracies, learning_rates
 
-    def plot_accuracies(epochs, train_accuracies, val_accuracies, num_runs, save_path):
-        plt.figure(figsize=(10, 6))
-        plt.plot(epochs, train_accuracies, 'b-', label='Training Accuracy')
-        plt.plot(epochs, val_accuracies, 'r-', label='Validation Accuracy')
-        plt.title(f'Training and Validation Accuracy Over Epochs (num_runs={num_runs})')
-        plt.xlabel('Epoch')
-        plt.ylabel('Accuracy (%)')
-        plt.legend()
-        plt.grid(True, linestyle='--', alpha=0.7)
-        plt.tight_layout()
-        plt.savefig(save_path, dpi=300, bbox_inches='tight')
-        plt.close()
-
-    # Modified main training section
+    # Modified main training section after model creation
     model = CNN(len(classes))
     device = torch.device("mps" if torch.backends.mps.is_available() else "cpu")
     model = model.to(device)
 
-    # Visualize and save CNN architecture
-    architecture_path = os.path.join(working_dir, f'cnn_architecture.png')
-    visualize_cnn_architecture(architecture_path)
+    # Save architecture visualizations
+    architecture_path = os.path.join(working_dir, f'cnn_architecture')
+    visualize_cnn_architecture(architecture_path + '_matplotlib.png', model)
+    visualize_cnn_torchviz(model, architecture_path + '_torchviz')
+    visualize_cnn_detailed(model, architecture_path + '_detailed.png')
 
     criterion = nn.CrossEntropyLoss()
     optimizer = optim.AdamW(model.parameters(), lr=config['learning_rate'])
     scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimizer, mode='min', factor=0.1, patience=3)
 
-    # Train the model and get accuracy history
-    epochs, train_accuracies, val_accuracies = train_model(model, train_loader, val_loader, criterion, optimizer, scheduler, device, config)
+    # Train the model and get all metrics
+    epochs, train_losses, val_losses, train_accuracies, val_accuracies, learning_rates = train_model(
+        model, train_loader, val_loader, criterion, optimizer, scheduler, device, config
+    )
 
-    # Plot and save accuracies
-    accuracy_plot_path = os.path.join(working_dir, f'accuracy_plot_num_runs_{num_runs}.png')
-    plot_accuracies(epochs, train_accuracies, val_accuracies, num_runs, accuracy_plot_path)
+    # Plot comprehensive training metrics
+    plot_training_metrics(epochs, train_losses, val_losses, train_accuracies, val_accuracies, 
+                         learning_rates, num_runs, working_dir)
 
     # Evaluate the model
     model.eval()
