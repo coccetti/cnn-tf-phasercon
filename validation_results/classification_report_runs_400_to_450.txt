@@ -1,0 +1,20 @@
+                                  precision    recall  f1-score   support
+
+         input_mask_blank_screen     1.0000    1.0000    1.0000        51
+input_mask_horizontal_division_A     0.8421    0.9412    0.8889        51
+input_mask_horizontal_division_B     0.9333    0.8235    0.8750        51
+  input_mask_vertical_division_A     1.0000    1.0000    1.0000        51
+  input_mask_vertical_division_B     0.5823    0.9020    0.7077        51
+        input_mask_checkboard_1A     0.7826    0.3529    0.4865        51
+        input_mask_checkboard_1B     1.0000    0.0784    0.1455        51
+        input_mask_checkboard_1R     0.5204    1.0000    0.6846        51
+        input_mask_checkboard_2A     0.3333    0.2549    0.2889        51
+        input_mask_checkboard_2B     0.3968    0.4902    0.4386        51
+        input_mask_checkboard_3A     0.9184    0.8824    0.9000        51
+        input_mask_checkboard_3B     0.8868    0.9216    0.9038        51
+        input_mask_checkboard_4A     0.9677    0.5882    0.7317        51
+        input_mask_checkboard_4B     0.7042    0.9804    0.8197        51
+
+                        accuracy                         0.7297       714
+                       macro avg     0.7763    0.7297    0.7051       714
+                    weighted avg     0.7763    0.7297    0.7051       714

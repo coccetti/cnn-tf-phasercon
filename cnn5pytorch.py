@@ -78,7 +78,7 @@ classes=["input_mask_blank_screen",
          "input_mask_checkboard_4A", "input_mask_checkboard_4B"]
 
 # Loop over different nRUN values
-for num_runs in range(30, 301, 10):
+for num_runs in range(300, 301, 10):
     start_time = time.time()  # Record the start time
     logging.info("\nstart_time: " + time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(start_time)))
     logging.info(f"\nRunning with num_runs = {num_runs}")
