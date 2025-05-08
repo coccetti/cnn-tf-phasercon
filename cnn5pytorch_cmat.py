@@ -151,30 +151,54 @@ for num_runs in range(230, 231, 10):
         resize_measured_phase[ii] = cv2.resize(measured_phase[ii], (y_resize, x_resize), interpolation=cv2.INTER_NEAREST)
     measured_phase = resize_measured_phase
 
-    # Split data between Train and Test, then Normalization
+    # Split data between Train, Validation and Test, then Normalization
     train_set_percentage = 0.6  # Set training set percentage
+    val_set_percentage = 0.2    # Set validation set percentage
+    # Test set will be the remaining 0.2 (1 - 0.6 - 0.2)
+    
     logging.info("\n### Splitting data ###")
-    train_measured_phase, test_measured_phase = np.split(measured_phase, [int(frame_number * train_set_percentage)])
-    train_reference_class_short, test_reference_class_short = np.split(reference_class_short, [int(frame_number * train_set_percentage)])
+    # First split to get training set
+    train_size = int(frame_number * train_set_percentage)
+    train_measured_phase = measured_phase[:train_size]
+    train_reference_class_short = reference_class_short[:train_size]
+    
+    # Second split to get validation and test sets
+    remaining_data = measured_phase[train_size:]
+    remaining_labels = reference_class_short[train_size:]
+    val_size = int(len(remaining_data) * (val_set_percentage / (1 - train_set_percentage)))
+    
+    val_measured_phase = remaining_data[:val_size]
+    val_reference_class_short = remaining_labels[:val_size]
+    
+    test_measured_phase = remaining_data[val_size:]
+    test_reference_class_short = remaining_labels[val_size:]
+    
     logging.info(f"- train_measured_phase tensor shape: {train_measured_phase.shape}")
+    logging.info(f"- val_measured_phase tensor shape: {val_measured_phase.shape}")
     logging.info(f"- test_measured_phase tensor shape: {test_measured_phase.shape}")
     logging.info(f"- train_reference_class_short tensor shape: {train_reference_class_short.shape}")
+    logging.info(f"- val_reference_class_short tensor shape: {val_reference_class_short.shape}")
     logging.info(f"- test_reference_class_short tensor shape: {test_reference_class_short.shape}")
 
     # Normalize "pixel" values to be between 0 and 1
     train_measured_phase = (train_measured_phase - np.min(train_measured_phase)) / (np.max(train_measured_phase) - np.min(train_measured_phase))
+    val_measured_phase = (val_measured_phase - np.min(val_measured_phase)) / (np.max(val_measured_phase) - np.min(val_measured_phase))
     test_measured_phase = (test_measured_phase - np.min(test_measured_phase)) / (np.max(test_measured_phase) - np.min(test_measured_phase))
 
     # Convert numpy arrays to PyTorch tensors
     train_measured_phase = torch.tensor(train_measured_phase, dtype=torch.float32).unsqueeze(1)
+    val_measured_phase = torch.tensor(val_measured_phase, dtype=torch.float32).unsqueeze(1)
     test_measured_phase = torch.tensor(test_measured_phase, dtype=torch.float32).unsqueeze(1)
     train_reference_class_short = torch.tensor(train_reference_class_short, dtype=torch.long).squeeze()
+    val_reference_class_short = torch.tensor(val_reference_class_short, dtype=torch.long).squeeze()
     test_reference_class_short = torch.tensor(test_reference_class_short, dtype=torch.long).squeeze()
 
     # Create DataLoader for batching
     train_dataset = TensorDataset(train_measured_phase, train_reference_class_short)
+    val_dataset = TensorDataset(val_measured_phase, val_reference_class_short)
     test_dataset = TensorDataset(test_measured_phase, test_reference_class_short)
     train_loader = DataLoader(train_dataset, batch_size=32, shuffle=True)
+    val_loader = DataLoader(val_dataset, batch_size=32, shuffle=False)
     test_loader = DataLoader(test_dataset, batch_size=32, shuffle=False)
 
     # Define the neural network architecture
@@ -204,12 +228,17 @@ for num_runs in range(230, 231, 10):
 
     # Training loop
     n_epochs = 10
+    best_val_loss = float('inf')
+    patience = 3  # Number of epochs to wait for improvement
+    patience_counter = 0
+    best_model_state = None
+    
     for epoch in range(n_epochs):
+        # Training phase
         model.train()
         running_loss = 0.0
-        pbar = tqdm(train_loader, desc=f'Epoch {epoch+1}/{n_epochs}')
+        pbar = tqdm(train_loader, desc=f'Epoch {epoch+1}/{n_epochs} [Train]')
         for inputs, labels in pbar:
-            # Move data to the appropriate device
             inputs = inputs.to(device)
             labels = labels.to(device)
             
@@ -220,20 +249,62 @@ for num_runs in range(230, 231, 10):
             optimizer.step()
             running_loss += loss.item()
             
-            # Update progress bar with current loss
             pbar.set_postfix({'loss': f'{loss.item():.4f}'})
             
-        avg_loss = running_loss/len(train_loader)
-        logging.info(f"Epoch {epoch+1}/{n_epochs}, Loss: {avg_loss:.4f}")
+        avg_train_loss = running_loss/len(train_loader)
+        
+        # Validation phase
+        model.eval()
+        val_loss = 0.0
+        val_correct = 0
+        val_total = 0
+        with torch.no_grad():
+            pbar = tqdm(val_loader, desc=f'Epoch {epoch+1}/{n_epochs} [Val]')
+            for inputs, labels in pbar:
+                inputs = inputs.to(device)
+                labels = labels.to(device)
+                
+                outputs = model(inputs)
+                loss = criterion(outputs, labels)
+                val_loss += loss.item()
+                
+                _, predicted = torch.max(outputs.data, 1)
+                val_total += labels.size(0)
+                val_correct += (predicted == labels).sum().item()
+                
+                val_acc = 100 * val_correct / val_total
+                pbar.set_postfix({'loss': f'{loss.item():.4f}', 'acc': f'{val_acc:.2f}%'})
+        
+        avg_val_loss = val_loss/len(val_loader)
+        val_accuracy = 100 * val_correct / val_total
+        
+        logging.info(f"Epoch {epoch+1}/{n_epochs}")
+        logging.info(f"Train Loss: {avg_train_loss:.4f}")
+        logging.info(f"Val Loss: {avg_val_loss:.4f}, Val Accuracy: {val_accuracy:.2f}%")
+        
+        # Early stopping check
+        if avg_val_loss < best_val_loss:
+            best_val_loss = avg_val_loss
+            patience_counter = 0
+            best_model_state = model.state_dict().copy()
+        else:
+            patience_counter += 1
+            if patience_counter >= patience:
+                logging.info(f"Early stopping triggered after {epoch+1} epochs")
+                break
+    
+    # Load the best model state
+    if best_model_state is not None:
+        model.load_state_dict(best_model_state)
+        logging.info("Loaded best model state based on validation loss")
 
-    # Evaluate the model
+    # Evaluate the model on test set
     model.eval()
     correct = 0
     total = 0
     with torch.no_grad():
-        pbar = tqdm(test_loader, desc='Evaluating')
+        pbar = tqdm(test_loader, desc='Evaluating on test set')
         for inputs, labels in pbar:
-            # Move data to the appropriate device
             inputs = inputs.to(device)
             labels = labels.to(device)
             
@@ -242,7 +313,6 @@ for num_runs in range(230, 231, 10):
             total += labels.size(0)
             correct += (predicted == labels).sum().item()
             
-            # Update progress bar with current accuracy
             current_acc = 100 * correct / total
             pbar.set_postfix({'accuracy': f'{current_acc:.2f}%'})
             
